@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VG Live TV</title>
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.7.11/shaka-player.ui.min.js" crossorigin="anonymous"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.7.11/controls.min.css" crossorigin="anonymous">
+  
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+
+  <style>
+    /* --- LAYOUT RESET --- */
+    * { margin: 0; padding: 0; box-sizing: border-box; outline: none; }
+    body, html { height: 100%; width: 100%; background: #000; font-family: 'Segoe UI', sans-serif; overflow: hidden; }
+    
+    #app-container { display: flex; height: 100vh; width: 100vw; }
+
+    /* --- SIDEBAR (Channel List) --- */
+    #sidebar {
+      width: 350px;
+      background: #141414;
+      border-right: 1px solid #222;
+      display: flex;
+      flex-direction: column;
+      transition: transform 0.3s ease;
+      z-index: 20;
+    }
+    .header {
+      padding: 20px;
+      background: #1a1a1a;
+      border-bottom: 1px solid #333;
+      display: flex; flex-direction: column; gap: 5px;
+    }
+    .brand {
+      color: #e50914;
+      font-size: 24px;
+      font-weight: 900;
+      letter-spacing: 1px;
+      display: flex; align-items: center; gap: 10px;
+      margin-bottom: 2px;
+    }
+    
+    /* New Text Styles */
+    .credit-text {
+        font-size: 11px; color: #666; font-weight: bold; text-transform: uppercase;
+    }
+    .sub-header {
+        color: #fff; font-size: 14px; font-weight: bold; 
+        margin: 10px 0; padding-left: 10px; 
+        border-left: 3px solid #e50914;
+    }
+
+    /* Search & Controls */
+    .controls-row {
+      display: flex; gap: 8px; margin-top: 5px;
+    }
+    .search-box {
+      flex: 1;
+      padding: 12px;
+      background: #000;
+      border: 1px solid #e50914;
+      color: #fff;
+      border-radius: 6px;
+      font-size: 14px;
+    }
+    .search-box:focus { border-color: #b20710; }
+
+    .icon-btn {
+      width: 42px;
+      height: 42px;
+      background: #222;
+      border: 1px solid #333;
+      color: #fff;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: 0.2s;
+      font-size: 16px;
+    }
+    .icon-btn:hover { background: #333; border-color: #e50914; color: #e50914; }
+
+    #channel-list {
+      flex: 1;
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: #e50914 #121212;
+    }
+    .channel-item {
+      display: flex;
+      align-items: center;
+      padding: 12px 20px;
+      border-bottom: 1px solid #1f1f1f;
+      cursor: pointer;
+      transition: background 0.2s;
+      color: #ccc;
+    }
+    .channel-item:hover { background: #1f1f1f; color: white; }
+    .channel-item.active { background: #e50914; color: white; }
+    
+    .ch-num {
+      font-size: 13px; font-weight: bold; color: #666; margin-right: 10px; min-width: 25px;
+    }
+    .channel-item.active .ch-num { color: rgba(255,255,255,0.7); }
+
+    .ch-logo {
+      width: 35px; height: 35px;
+      object-fit: contain;
+      background: rgba(255,255,255,0.05);
+      border-radius: 4px;
+      margin-right: 15px;
+    }
+    .ch-info { display: flex; flex-direction: column; overflow: hidden; }
+    .ch-name { font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    
+    /* Error/Reload Styling */
+    .error-container {
+      height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #666;
+    }
+    .reload-btn {
+      margin-top: 15px; padding: 10px 20px; background: #e50914; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 14px; display: flex; align-items: center; gap: 8px;
+    }
+
+    /* --- VIDEO AREA --- */
+    #player-wrapper {
+      flex: 1;
+      position: relative;
+      background: #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    video { width: 100%; height: 100%; object-fit: contain; }
+    
+    /* --- SHAKA CUSTOM CSS --- */
+    .shaka-video-container { width: 100%; height: 100%; }
+    
+    .shaka-live-button { display: flex !important; align-items: center !important; color: white !important; }
+    .shaka-live-button::before {
+      content: "";
+      width: 10px; height: 10px;
+      background-color: #ff0000;
+      border-radius: 50%;
+      margin-right: 8px;
+      display: inline-block;
+      animation: vgBlink 1.2s infinite;
+      box-shadow: 0 0 6px #ff0000;
+    }
+    @keyframes vgBlink {
+      0% { opacity: 1; }
+      50% { opacity: 0.3; }
+      100% { opacity: 1; }
+    }
+    .shaka-range-container { background: #e50914 !important; }
+    .shaka-volume-bar-container { background: #e50914 !important; }
+    .shaka-spinner-container { display: none !important; }
+
+    /* Custom Next/Prev Buttons inside Player */
+    .vg-ctrl-btn {
+        background: transparent;
+        border: none;
+        color: white;
+        cursor: pointer;
+        font-size: 18px;
+        padding: 0 10px;
+        transition: transform 0.2s;
+        display: flex; align-items: center; justify-content: center;
+    }
+    .vg-ctrl-btn:hover { color: #e50914; transform: scale(1.2); }
+
+    /* Mobile Toggle */
+    #toggle-sidebar { display: none; position: absolute; top: 15px; left: 15px; z-index: 100; background: #e50914; border: none; color: white; padding: 8px 12px; border-radius: 4px; cursor: pointer; }
+    
+    @media (max-width: 768px) {
+      #sidebar { position: absolute; height: 100%; transform: translateX(-100%); width: 85%; }
+      #sidebar.open { transform: translateX(0); }
+      #toggle-sidebar { display: block; }
+      
+      /* --- HIDE VOLUME ON MOBILE --- */
+      .shaka-volume-bar-container, 
+      .shaka-mute-button {
+          display: none !important;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <button id="toggle-sidebar" onclick="toggleSidebar()"><i class="fa-solid fa-bars"></i></button>
+
+  <div id="app-container">
+    
+    <div id="sidebar">
+      <div class="header">
+        <div class="brand"><i class="fa-solid fa-tv"></i> VG Live TV</div>
+        <div class="credit-text">Created By Vikash Gupta</div>
+        <div class="sub-header">Indian TV Channels</div>
+
+        <div class="controls-row">
+          <button class="icon-btn" onclick="askUrl()" title="Paste Link"><i class="fa-solid fa-link"></i></button>
+          <input type="text" class="search-box" id="search" placeholder="Search Channels..." onkeyup="filterChannels()">
+        </div>
+      </div>
+
+      <div id="channel-list">
+        <div style="padding:40px; text-align:center; color:#555;">
+          <i class="fa-solid fa-spinner fa-spin fa-2x"></i><br><br>Loading Playlist...
+        </div>
+      </div>
+    </div>
+
+    <div id="player-wrapper">
+      <div id="video-container" class="shaka-video-container">
+        <video autoplay playsinline id="video-canvas"></video>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    const PLAYLIST_URL = 'https://iptv-org.github.io/iptv/raw/in.m3u';
+    let channels = [];
+    let player;
+    let ui;
+    let currentIndex = -1;
+    let autoSkipTimer = null;
+
+    // --- 1. REGISTER CUSTOM BUTTONS ---
+    class PreviousButton extends shaka.ui.Element {
+        constructor(parent, controls) {
+            super(parent, controls);
+            this.button_ = document.createElement('button');
+            this.button_.classList.add('vg-ctrl-btn');
+            this.button_.innerHTML = '<i class="fa-solid fa-backward-step"></i>';
+            this.button_.onclick = () => window.playNext(-1);
+            this.parent.appendChild(this.button_);
+        }
+    }
+    PreviousButton.Factory = class { create(root, controls) { return new PreviousButton(root, controls); } };
+    shaka.ui.Controls.registerElement('previous', new PreviousButton.Factory());
+
+    class NextButton extends shaka.ui.Element {
+        constructor(parent, controls) {
+            super(parent, controls);
+            this.button_ = document.createElement('button');
+            this.button_.classList.add('vg-ctrl-btn');
+            this.button_.innerHTML = '<i class="fa-solid fa-forward-step"></i>';
+            this.button_.onclick = () => window.playNext(1);
+            this.parent.appendChild(this.button_);
+        }
+    }
+    NextButton.Factory = class { create(root, controls) { return new NextButton(root, controls); } };
+    shaka.ui.Controls.registerElement('next', new NextButton.Factory());
+
+
+    // --- 2. APP INIT ---
+    async function initApp() {
+      shaka.polyfill.installAll();
+      if (!shaka.Player.isBrowserSupported()) {
+        alert('Browser not supported!');
+        return;
+      }
+      initPlayer();
+      loadPlaylist();
+    }
+
+    // --- 3. PLAYER SETUP ---
+    function initPlayer() {
+      const video = document.getElementById('video-canvas');
+      const container = document.getElementById('video-container');
+
+      player = new shaka.Player(video);
+      ui = new shaka.ui.Overlay(player, container, video);
+
+      ui.configure({
+        'controlPanelElements': [
+          'previous', 'play_pause', 'next', 
+          'time_and_duration', 'spacer', 'mute', 'volume', 
+          'picture_in_picture', 'quality', 'fullscreen'
+        ],
+        'addBigPlayButton': false,
+        'seekBarColors': { base: 'rgba(255, 255, 255, 0.2)', played: '#e50914' },
+        'volumeBarColors': { base: 'rgba(255, 255, 255, 0.2)', level: '#e50914' }
+      });
+
+      player.configure({
+        streaming: { lowLatencyMode: true, useNativeHlsOnSafari: true }
+      });
+
+      // Silent Auto-Skip Logic
+      player.addEventListener('error', (e) => {
+         console.error('Player Error', e.detail);
+         triggerAutoSkip();
+      });
+    }
+
+    // --- 4. AUTO SKIP ---
+    function triggerAutoSkip() {
+        if(autoSkipTimer) return;
+        console.log("Stream failed. Auto-skipping to next channel in 10s...");
+        autoSkipTimer = setTimeout(() => { window.playNext(1); }, 10000); 
+    }
+    function cancelAutoSkip() {
+        if(autoSkipTimer) { clearTimeout(autoSkipTimer); autoSkipTimer = null; }
+    }
+
+    // --- 5. NAVIGATION ---
+    window.playNext = function(direction) {
+        if(channels.length === 0) return;
+        let newIndex = currentIndex + direction;
+        if(newIndex >= channels.length) newIndex = 0;
+        if(newIndex < 0) newIndex = channels.length - 1;
+
+        const allItems = document.querySelectorAll('.channel-item');
+        if(allItems[newIndex]) {
+            playChannel(channels[newIndex].url, allItems[newIndex], newIndex);
+            allItems[newIndex].scrollIntoView({behavior: "smooth", block: "center"});
+        }
+    };
+
+    // --- 6. PLAY ---
+    async function playChannel(url, element, index) {
+      cancelAutoSkip();
+      if(index !== undefined) currentIndex = index;
+
+      document.querySelectorAll('.channel-item').forEach(el => el.classList.remove('active'));
+      if(element) element.classList.add('active');
+
+      if (window.innerWidth < 768) {
+        document.getElementById('sidebar').classList.remove('open');
+      }
+
+      try {
+        await player.load(url);
+        
+        const liveBtn = document.querySelector('.shaka-live-button');
+        if (liveBtn) {
+          liveBtn.addEventListener('click', () => {
+            const video = document.getElementById('video-canvas');
+            video.currentTime = player.seekRange().end;
+          });
+        }
+      } catch (e) {
+        console.error("Load Error:", e);
+        triggerAutoSkip();
+      }
+    }
+
+    // --- 7. MANUAL PASTE ---
+    function askUrl() {
+        let u = prompt("Paste Video URL (.m3u8):");
+        if(u && u.trim() !== "") {
+            playChannel(u.trim(), null, -1);
+        }
+    }
+
+    // --- 8. LOAD PLAYLIST ---
+    async function loadPlaylist() {
+      try {
+        const response = await fetch(PLAYLIST_URL);
+        if (!response.ok) throw new Error("Network Error");
+        const text = await response.text();
+        
+        const lines = text.split('\n');
+        channels = [];
+        let currentCh = {};
+
+        lines.forEach(line => {
+          line = line.trim();
+          if (line.startsWith('#EXTINF:')) {
+            const logoMatch = line.match(/tvg-logo="([^"]*)"/);
+            const namePart = line.split(',')[1];
+            
+            currentCh = {
+              name: namePart ? namePart.trim() : 'Unknown Channel',
+              logo: logoMatch ? logoMatch[1] : '',
+              url: ''
+            };
+          } else if (line.startsWith('http')) {
+            currentCh.url = line;
+            if (currentCh.name) channels.push(currentCh);
+            currentCh = {};
+          }
+        });
+
+        renderChannels(channels);
+
+      } catch (e) {
+        document.getElementById('channel-list').innerHTML = `
+            <div class="error-container">
+                <i class="fa-solid fa-triangle-exclamation fa-2x" style="margin-bottom:15px; color:#e50914;"></i>
+                <div>Failed to load channels.</div>
+                <button class="reload-btn" onclick="loadPlaylist()">
+                    <i class="fa-solid fa-rotate-right"></i> Reload
+                </button>
+            </div>`;
+      }
+    }
+
+    // --- 9. RENDER ---
+    function renderChannels(list) {
+      const container = document.getElementById('channel-list');
+      container.innerHTML = '';
+      
+      // Update count in brand if needed, or keep generic
+      // document.querySelector('.brand').innerHTML = `<i class="fa-solid fa-tv"></i> VG Live TV`;
+
+      list.forEach((ch, index) => {
+        const div = document.createElement('div');
+        div.className = 'channel-item';
+        div.onclick = () => playChannel(ch.url, div, index);
+        
+        const logoHtml = ch.logo ? `<img src="${ch.logo}" class="ch-logo" onerror="this.style.display='none'">` : `<div class="ch-logo" style="display:flex;align-items:center;justify-content:center;color:#555;"><i class="fa-solid fa-tv"></i></div>`;
+
+        div.innerHTML = `
+            <div class="ch-num">${index + 1}.</div>
+            ${logoHtml} 
+            <div class="ch-info"><div class="ch-name">${ch.name}</div></div>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    // --- 10. SEARCH ---
+    function filterChannels() {
+      const term = document.getElementById('search').value.toLowerCase();
+      const items = document.querySelectorAll('.channel-item');
+      items.forEach((item, index) => {
+        const name = channels[index].name.toLowerCase();
+        if(name.includes(term)) {
+            item.style.display = 'flex';
+        } else {
+            item.style.display = 'none';
+        }
+      });
+    }
+
+    function toggleSidebar() {
+      document.getElementById('sidebar').classList.toggle('open');
+    }
+
+    document.addEventListener('DOMContentLoaded', initApp);
+  </script>
+</body>
+</html>
