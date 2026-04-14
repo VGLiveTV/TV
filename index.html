@@ -276,12 +276,12 @@
       ui.configure({
         'controlPanelElements': [
           'previous', 'play_pause', 'next', 
-          'time_and_duration', 'spacer', 'mute', 'volume', 
+          'time_and_duration', 'mute', 'volume', 'spacer',  
           'picture_in_picture', 'quality', 'fullscreen'
         ],
         'addBigPlayButton': false,
-        'seekBarColors': { base: 'rgba(255, 255, 255, 0.2)', played: '#e50914' },
-        'volumeBarColors': { base: 'rgba(255, 255, 255, 0.2)', level: '#e50914' }
+        'seekBarColors': { base: 'white', played: 'red' },
+        'volumeBarColors': { base: 'white', level: 'red' }
       });
 
       player.configure({
